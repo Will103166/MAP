@@ -23,39 +23,33 @@
           type="file"
           accept=".zip,.kmz,.kml,.csv"
           multiple
-          class="admin-only"
         />
         <button id="locateBtn" type="button">定位到目前位置</button>
-        <button id="clearLayersBtn" type="button" class="admin-only">清除圖層</button>
-        <button id="refreshBtn" type="button" class="admin-only">更新 / 清除快取</button>
-        <button id="adminBtn" type="button">後台登入</button>
+        <button id="clearLayersBtn" type="button">清除圖層</button>
+        <button id="refreshBtn" type="button">更新 / 清除快取</button>
       </div>
       <div class="control-row">
         <input
           id="sheetUrlInput"
           type="url"
           placeholder="貼上 Google 試算表或 CSV 網址"
-          class="admin-only"
         />
-        <button id="importSheetBtn" type="button" class="admin-only">
-          匯入線上儲存格
-        </button>
+        <button id="importSheetBtn" type="button">匯入線上儲存格</button>
       </div>
       <div class="control-row">
         <label>
           底圖
           <select id="basemapSelect">
-            <option value="osm">OSM 預設</option>
+            <option value="osm">預設 (OSM)</option>
             <option value="googleSat">Google 衛星</option>
             <option value="googleTerrain">Google 地形</option>
-            <option value="nlscPhoto">國土測繪中心正射影像</option>
+            <option value="nlscPhoto">國土測繪中心正攝影像</option>
           </select>
         </label>
-        <button id="measureDistanceBtn" type="button">量距</button>
-        <button id="measureAreaBtn" type="button">量面積</button>
+        <button id="measureDistanceBtn" type="button">量距離 (m)</button>
+        <button id="measureAreaBtn" type="button">量面積 (m²)</button>
         <button id="measureClearBtn" type="button">清除量測</button>
-        <button id="rayBtn" type="button">射線</button>
-        <button id="coordLocateBtn" type="button">坐標定位 / 轉換</button>
+        <button id="gotoTwd97Btn" type="button">定位到 TWD97 坐標</button>
       </div>
       <p class="hint">
         支援：SHP ZIP（含 .shp/.shx/.dbf）、KMZ/KML、CSV、Google 試算表 URL。
@@ -134,51 +128,27 @@
       </form>
     </dialog>
 
-    <dialog id="adminDialog">
-      <form id="adminForm" method="dialog">
-        <h3>後台登入</h3>
+    <dialog id="gotoDialog">
+      <form id="gotoForm" method="dialog">
+        <h3>定位到 TWD97 坐標</h3>
         <label>
-          密碼
-          <input id="adminPasswordInput" type="password" autocomplete="off" />
+          分帶
+          <select id="gotoZoneSelect">
+            <option value="121">121（台灣本島常用）</option>
+            <option value="119">119（金門/馬祖/澎湖常見）</option>
+          </select>
+        </label>
+        <label>
+          X (東向, m)
+          <input id="gotoXInput" type="number" required />
+        </label>
+        <label>
+          Y (北向, m)
+          <input id="gotoYInput" type="number" required />
         </label>
         <menu>
           <button value="cancel" type="submit">取消</button>
-          <button value="default" type="submit">登入</button>
-        </menu>
-      </form>
-    </dialog>
-
-    <dialog id="coordDialog">
-      <form id="coordForm" method="dialog">
-        <h3>坐標定位 / 轉換</h3>
-        <label>
-          輸入座標系統
-          <select id="coordInputSystem">
-            <option value="wgs84">WGS84 (經緯度)</option>
-            <option value="twd97">TWD97 TM2</option>
-          </select>
-        </label>
-        <label id="coordInputZoneWrap" class="hidden">
-          TWD97 分帶
-          <select id="coordInputZone">
-            <option value="121">121（台灣本島）</option>
-            <option value="119">119（金門/馬祖/澎湖）</option>
-          </select>
-        </label>
-        <label>
-          X / 經度
-          <input id="coordInputX" type="number" step="any" />
-        </label>
-        <label>
-          Y / 緯度
-          <input id="coordInputY" type="number" step="any" />
-        </label>
-        <p id="coordResult" class="hint"></p>
-        <menu>
-          <button value="cancel" type="submit">關閉</button>
-          <button id="coordLocateRunBtn" value="default" type="submit">
-            定位
-          </button>
+          <button value="default" type="submit">定位</button>
         </menu>
       </form>
     </dialog>
@@ -193,7 +163,6 @@
     <script src="https://cdn.jsdelivr.net/npm/shpjs@latest/dist/shp.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.3/src/leaflet.geometryutil.min.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
