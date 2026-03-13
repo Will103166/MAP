@@ -245,29 +245,6 @@ function rowsToGeoJSON(rows, config) {
   };
 }
 
-function decodeCsvBuffer(buffer) {
-  const utf8Decoder = new TextDecoder("utf-8", { fatal: false });
-  let utf8Text = utf8Decoder.decode(buffer);
-
-  const looksBroken = utf8Text.includes("\uFFFD");
-  if (!looksBroken) {
-    return utf8Text;
-  }
-
-  try {
-    const big5Decoder = new TextDecoder("big5", { fatal: false });
-    const big5Text = big5Decoder.decode(buffer);
-    const brokenCount = (utf8Text.match(/\uFFFD/g) || []).length;
-    const brokenBig5 = (big5Text.match(/\uFFFD/g) || []).length;
-    if (brokenBig5 < brokenCount) {
-      return big5Text;
-    }
-    return utf8Text;
-  } catch {
-    return utf8Text;
-  }
-}
-
 async function importCsvContent(csvText, sourceName) {
   const parsed = Papa.parse(csvText, {
     header: true,
@@ -326,12 +303,36 @@ async function importKmzFile(file) {
   await importKmlText(kmlText, file.name);
 }
 
+async function readTextWithEncodingFallback(file) {
+  const buffer = await file.arrayBuffer();
+  let text = "";
+  try {
+    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  } catch {
+    text = "";
+  }
+
+  if (text && !text.includes("�")) {
+    return text;
+  }
+
+  try {
+    const big5Decoder = new TextDecoder("big5", { fatal: false });
+    const big5Text = big5Decoder.decode(buffer);
+    if (big5Text && (!text || big5Text.includes("店家名稱") || big5Text.includes("緯度") || big5Text.includes("經度"))) {
+      return big5Text;
+    }
+    return big5Text || text;
+  } catch {
+    return text;
+  }
+}
+
 async function importFile(file) {
   const lower = file.name.toLowerCase();
   if (lower.endsWith(".csv")) {
-    const buffer = await file.arrayBuffer();
-    const decoded = decodeCsvBuffer(buffer);
-    await importCsvContent(decoded, file.name);
+    const csvText = await readTextWithEncodingFallback(file);
+    await importCsvContent(csvText, file.name);
     return;
   }
   if (lower.endsWith(".zip")) {
