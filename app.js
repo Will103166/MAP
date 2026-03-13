@@ -11,6 +11,7 @@ const basemapSelect = document.getElementById("basemapSelect");
 const measureDistanceBtn = document.getElementById("measureDistanceBtn");
 const measureAreaBtn = document.getElementById("measureAreaBtn");
 const measureClearBtn = document.getElementById("measureClearBtn");
+const rayBtn = document.getElementById("rayBtn");
 const coordLocateBtn = document.getElementById("coordLocateBtn");
 const adminBtn = document.getElementById("adminBtn");
 
@@ -78,6 +79,8 @@ let isAdmin = false;
 let measureMode = null;
 let measurePoints = [];
 let measureLayer = null;
+let rayPoints = [];
+let rayLayer = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -146,6 +149,7 @@ function addGeoJsonLayer(layerName, geojson, colorHint) {
     style,
     layer,
     count: geojson?.features?.length || 0,
+    ownedByAdmin: isAdmin,
   };
   activeLayers.push(item);
   refreshLayerList();
@@ -200,7 +204,7 @@ layerListEl.addEventListener("click", (event) => {
       map.fitBounds(bounds.pad(0.15));
     }
   } else if (action === "style") {
-    if (!isAdmin) return;
+    if (item.ownedByAdmin && !isAdmin) return;
     editingStyleLayerId = item.id;
     styleTitle.textContent = `圖層樣式：${item.name}`;
     styleColorInput.value = item.style.color;
@@ -208,7 +212,7 @@ layerListEl.addEventListener("click", (event) => {
     styleVisibleCheckbox.checked = item.style.visible;
     styleDialog.showModal();
   } else if (action === "toggle") {
-    if (!isAdmin) return;
+    if (item.ownedByAdmin && !isAdmin) return;
     item.style.visible = !item.style.visible;
     if (item.style.visible) {
       if (!map.hasLayer(item.layer)) {
@@ -219,7 +223,7 @@ layerListEl.addEventListener("click", (event) => {
     }
     refreshLayerList();
   } else if (action === "remove") {
-    if (!isAdmin) return;
+    if (item.ownedByAdmin && !isAdmin) return;
     map.removeLayer(item.layer);
     activeLayers.splice(index, 1);
     refreshLayerList();
@@ -235,6 +239,7 @@ clearLayersBtn.addEventListener("click", () => {
   activeLayers.length = 0;
   refreshLayerList();
   setStatus("已清除全部圖層。");
+  savePersistentLayers();
 });
 
 locateBtn.addEventListener("click", () => {
@@ -406,6 +411,7 @@ async function importCsvContent(csvText, sourceName) {
   const geojson = rowsToGeoJSON(parsed.data, config);
   addGeoJsonLayer(sourceName, geojson);
   setStatus(`匯入完成：${sourceName}，共 ${geojson.features.length} 筆點位。`);
+  savePersistentLayers();
 }
 
 async function importZipShapefile(file) {
@@ -425,6 +431,7 @@ async function importZipShapefile(file) {
   });
 
   setStatus(`匯入完成：${file.name}（${collections.length} 個圖層）`);
+  savePersistentLayers();
 }
 
 async function importKmlText(kmlText, sourceName) {
@@ -565,6 +572,58 @@ async function importFile(file) {
   throw new Error(`不支援的格式：${file.name}`);
 }
 
+function savePersistentLayers() {
+  const toSave = activeLayers
+    .filter((it) => it.ownedByAdmin)
+    .map((it) => ({
+      name: it.name,
+      geojson: it.geojson,
+      style: it.style,
+    }));
+  try {
+    localStorage.setItem("online-map-layers-v1", JSON.stringify(toSave));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function loadPersistentLayers() {
+  let raw;
+  try {
+    raw = localStorage.getItem("online-map-layers-v1");
+  } catch {
+    raw = null;
+  }
+  if (!raw) return;
+  try {
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return;
+    list.forEach((entry) => {
+      if (!entry || !entry.geojson) return;
+      const color = entry.style?.color;
+      const prevAdmin = isAdmin;
+      isAdmin = true;
+      addGeoJsonLayer(entry.name || "圖層", entry.geojson, color);
+      const last = activeLayers[activeLayers.length - 1];
+      if (last) {
+        last.style = {
+          color: entry.style?.color || last.style.color,
+          marker: entry.style?.marker || last.style.marker,
+          visible: entry.style?.visible ?? last.style.visible,
+        };
+        last.ownedByAdmin = true;
+        map.removeLayer(last.layer);
+        last.layer = createLeafletLayer(last.geojson, last.style);
+        if (last.style.visible) last.layer.addTo(map);
+      }
+      isAdmin = prevAdmin;
+    });
+    refreshLayerList();
+  } catch {
+    // ignore
+  }
+}
+
 fileInput.addEventListener("change", async (event) => {
   if (!isAdmin) {
     setStatus("請先登入後台再匯入資料。", true);
@@ -655,6 +714,7 @@ if ("serviceWorker" in navigator) {
     } catch (error) {
       console.warn("SW 註冊失敗:", error);
     }
+    loadPersistentLayers();
   });
 }
 
@@ -672,23 +732,22 @@ adminBtn.addEventListener("click", () => {
   adminDialog.showModal();
 });
 
-adminForm.addEventListener("submit", () => {
-  if (adminDialog.returnValue !== "default") {
-    return;
-  }
+adminForm.addEventListener("submit", (event) => {
+  event.preventDefault();
   const pwd = adminPasswordInput.value;
   if (pwd === "ABC123") {
     isAdmin = true;
     updateAdminUI();
     setStatus("已登入後台。");
+    adminDialog.close();
   } else {
     setStatus("密碼錯誤。", true);
   }
 });
 
-styleForm.addEventListener("submit", () => {
-  if (styleDialog.returnValue !== "default" || !editingStyleLayerId) {
-    editingStyleLayerId = null;
+styleForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!editingStyleLayerId) {
     return;
   }
   const item = activeLayers.find((l) => l.id === editingStyleLayerId);
@@ -705,6 +764,8 @@ styleForm.addEventListener("submit", () => {
     item.layer.addTo(map);
   }
   refreshLayerList();
+  savePersistentLayers();
+  styleDialog.close();
 });
 
 basemapSelect.addEventListener("change", () => {
@@ -745,12 +806,50 @@ measureClearBtn.addEventListener("click", () => {
     map.removeLayer(measureLayer);
     measureLayer = null;
   }
+  rayPoints = [];
+  if (rayLayer) {
+    map.removeLayer(rayLayer);
+    rayLayer = null;
+  }
   setStatus("已清除量測。");
+});
+
+rayBtn.addEventListener("click", () => {
+  measureMode = "ray";
+  rayPoints = [];
+  if (rayLayer) {
+    map.removeLayer(rayLayer);
+    rayLayer = null;
+  }
+  setStatus("射線模式：請在地圖上點兩下，第一點為起點。");
 });
 
 map.on("click", (event) => {
   if (!measureMode) return;
   const latlng = event.latlng;
+  if (measureMode === "ray") {
+    rayPoints.push(latlng);
+    if (rayPoints.length === 2) {
+      const [p1, p2] = rayPoints;
+      const dx = p2.lng - p1.lng;
+      const dy = p2.lat - p1.lat;
+      const factor = 5;
+      const p3 = L.latLng(p1.lat + dy * factor, p1.lng + dx * factor);
+      if (rayLayer) {
+        map.removeLayer(rayLayer);
+      }
+      rayLayer = L.polyline([p1, p3], {
+        color: "#ef4444",
+        weight: 2,
+        dashArray: "6,4",
+      }).addTo(map);
+      const dist = p1.distanceTo(p2);
+      setStatus(`射線：起點到第二點距離約 ${dist.toFixed(1)} 公尺。`);
+      measureMode = null;
+    }
+    return;
+  }
+
   measurePoints.push(latlng);
 
   if (measureLayer) {
@@ -768,16 +867,25 @@ map.on("click", (event) => {
       const km = total / 1000;
       setStatus(`距離：${total.toFixed(1)} 公尺（約 ${km.toFixed(3)} 公里）`);
     }
-  } else if (measureMode === "area" && measurePoints.length >= 3) {
-    measureLayer = L.polygon(measurePoints, {
-      color: "#22c55e",
-      weight: 2,
-      fillOpacity: 0.25,
-    }).addTo(map);
-    const latlngs = measurePoints.map((p) => [p.lat, p.lng]);
-    const area = L.GeometryUtil.geodesicArea(latlngs);
-    const ha = area / 10000;
-    setStatus(`面積：${area.toFixed(1)} 平方公尺（約 ${ha.toFixed(3)} 公頃）`);
+  } else if (measureMode === "area") {
+    if (measurePoints.length >= 3) {
+      measureLayer = L.polygon(measurePoints, {
+        color: "#22c55e",
+        weight: 2,
+        fillOpacity: 0.25,
+      }).addTo(map);
+      const latlngs = measurePoints.map((p) => [p.lat, p.lng]);
+      const area = L.GeometryUtil.geodesicArea(latlngs);
+      const ha = area / 10000;
+      setStatus(`面積：${area.toFixed(1)} 平方公尺（約 ${ha.toFixed(3)} 公頃）。雙擊可結束量測。`);
+    }
+  }
+});
+
+map.on("dblclick", () => {
+  if (measureMode === "area") {
+    measureMode = null;
+    setStatus("面積量測已結束。");
   }
 });
 
