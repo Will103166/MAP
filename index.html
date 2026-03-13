@@ -48,6 +48,7 @@
         <button id="measureDistanceBtn" type="button">量距離 (m)</button>
         <button id="measureAreaBtn" type="button">量面積 (m²)</button>
         <button id="measureClearBtn" type="button">清除量測</button>
+        <button id="circleBtn" type="button">畫圓</button>
         <button id="rayBtn" type="button">兩點射線</button>
         <button id="gotoTwd97Btn" type="button">定位到 TWD97 坐標</button>
       </div>
@@ -95,7 +96,7 @@
           <select id="nameFieldSelect"></select>
         </label>
         <menu>
-          <button value="cancel" type="submit">取消</button>
+          <button value="cancel" type="submit" formnovalidate>取消</button>
           <button id="tabularConfirmBtn" value="default" type="submit">
             匯入
           </button>
@@ -122,7 +123,7 @@
           顯示此圖層
         </label>
         <menu>
-          <button value="cancel" type="submit">取消</button>
+          <button value="cancel" type="submit" formnovalidate>取消</button>
           <button value="default" type="submit">套用</button>
         </menu>
       </form>
@@ -140,14 +141,14 @@
         </label>
         <label>
           X (東向, m)
-          <input id="gotoXInput" type="number" required />
+          <input id="gotoXInput" type="number" step="0.00001" required />
         </label>
         <label>
           Y (北向, m)
-          <input id="gotoYInput" type="number" required />
+          <input id="gotoYInput" type="number" step="0.00001" required />
         </label>
         <menu>
-          <button value="cancel" type="submit">取消</button>
+          <button value="cancel" type="submit" formnovalidate>取消</button>
           <button value="default" type="submit">定位</button>
         </menu>
       </form>

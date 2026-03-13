@@ -11,6 +11,7 @@ const basemapSelect = document.getElementById("basemapSelect");
 const measureDistanceBtn = document.getElementById("measureDistanceBtn");
 const measureAreaBtn = document.getElementById("measureAreaBtn");
 const measureClearBtn = document.getElementById("measureClearBtn");
+const circleBtn = document.getElementById("circleBtn");
 const gotoTwd97Btn = document.getElementById("gotoTwd97Btn");
 const rayBtn = document.getElementById("rayBtn");
 const styleDialog = document.getElementById("styleDialog");
@@ -71,6 +72,9 @@ let measurePoints = [];
 let measureLayer = null;
 let rayLayer = null;
 let rayPoints = [];
+let circleMode = false;
+let circleRadius = 0;
+let circleLayer = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -551,10 +555,47 @@ measureClearBtn.addEventListener("click", () => {
   setStatus("已清除量測。");
 });
 
+circleBtn.addEventListener("click", () => {
+  const input = window.prompt("請輸入圓半徑（公尺）", circleRadius || "100");
+  if (input == null) {
+    return;
+  }
+  const r = Number(input);
+  if (!Number.isFinite(r) || r <= 0) {
+    setStatus("半徑必須為正數。", true);
+    return;
+  }
+  circleRadius = r;
+  circleMode = true;
+  measureMode = "none";
+  measurePoints = [];
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+  setStatus("畫圓模式：請在地圖上點選圓心位置。");
+});
+
 map.on("click", (event) => {
-  if (measureMode === "none") return;
-  measurePoints.push(event.latlng);
-  updateMeasureGraphics();
+  if (measureMode !== "none") {
+    measurePoints.push(event.latlng);
+    updateMeasureGraphics();
+    return;
+  }
+
+  if (circleMode && circleRadius > 0) {
+    if (circleLayer) {
+      map.removeLayer(circleLayer);
+    }
+    circleLayer = L.circle(event.latlng, {
+      radius: circleRadius,
+      color: "#0ea5e9",
+      weight: 2,
+      fillColor: "#38bdf8",
+      fillOpacity: 0.25,
+    }).addTo(map);
+    setStatus(`圓：半徑 ${circleRadius.toFixed(2)} m。可再次點選以變更圓心。`);
+  }
 });
 
 rayBtn.addEventListener("click", () => {
@@ -611,7 +652,19 @@ rayBtn.addEventListener("click", () => {
     };
 
     const diag = map.distance(bounds.getSouthWest(), bounds.getNorthEast());
-    const end = extendPoint(diag * 2);
+    let length = diag * 2;
+    const input = window.prompt(
+      "請輸入射線長度（公尺，留空則自動）",
+      Math.round(length).toString()
+    );
+    if (input != null && input.trim() !== "") {
+      const v = Number(input);
+      if (Number.isFinite(v) && v > 0) {
+        length = v;
+      }
+    }
+
+    const end = extendPoint(length);
 
     if (rayLayer) {
       map.removeLayer(rayLayer);
@@ -639,7 +692,6 @@ gotoTwd97Btn.addEventListener("click", () => {
 gotoForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (gotoDialog.returnValue !== "default") {
-    gotoDialog.close("cancel");
     return;
   }
 
@@ -862,6 +914,26 @@ tabularForm.addEventListener("submit", () => {
   if (coordSystemSelect.value === "twd97" && !twd97ZoneSelect.value) {
     twd97ZoneSelect.value = "121";
   }
+});
+
+map.on("contextmenu", (event) => {
+  const { lat, lng } = event.latlng;
+  const googleNav = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  const googleStreet = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+  const appleNav = `https://maps.apple.com/?daddr=${lat},${lng}`;
+
+  const html = `
+    <div style="font-size:12px">
+      <div>座標：${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+      <ul style="margin:6px 0 0;padding-left:18px;">
+        <li><a href="${googleNav}" target="_blank" rel="noopener">Google 地圖導航</a></li>
+        <li><a href="${googleStreet}" target="_blank" rel="noopener">Google 街景</a></li>
+        <li><a href="${appleNav}" target="_blank" rel="noopener">Apple 地圖導航</a></li>
+      </ul>
+    </div>
+  `;
+
+  L.popup().setLatLng(event.latlng).setContent(html).openOn(map);
 });
 
 if ("serviceWorker" in navigator) {
