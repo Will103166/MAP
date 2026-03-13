@@ -7,12 +7,32 @@ const importSheetBtn = document.getElementById("importSheetBtn");
 const clearLayersBtn = document.getElementById("clearLayersBtn");
 const locateBtn = document.getElementById("locateBtn");
 const refreshBtn = document.getElementById("refreshBtn");
+const basemapSelect = document.getElementById("basemapSelect");
+const measureDistanceBtn = document.getElementById("measureDistanceBtn");
+const measureAreaBtn = document.getElementById("measureAreaBtn");
+const measureClearBtn = document.getElementById("measureClearBtn");
+const coordLocateBtn = document.getElementById("coordLocateBtn");
+const adminBtn = document.getElementById("adminBtn");
+
 const styleDialog = document.getElementById("styleDialog");
 const styleForm = document.getElementById("styleForm");
 const styleTitle = document.getElementById("styleTitle");
 const styleColorInput = document.getElementById("styleColorInput");
 const styleMarkerSelect = document.getElementById("styleMarkerSelect");
 const styleVisibleCheckbox = document.getElementById("styleVisibleCheckbox");
+
+const adminDialog = document.getElementById("adminDialog");
+const adminForm = document.getElementById("adminForm");
+const adminPasswordInput = document.getElementById("adminPasswordInput");
+
+const coordDialog = document.getElementById("coordDialog");
+const coordForm = document.getElementById("coordForm");
+const coordInputSystem = document.getElementById("coordInputSystem");
+const coordInputZoneWrap = document.getElementById("coordInputZoneWrap");
+const coordInputZone = document.getElementById("coordInputZone");
+const coordInputX = document.getElementById("coordInputX");
+const coordInputY = document.getElementById("coordInputY");
+const coordResult = document.getElementById("coordResult");
 
 const layerListEl = document.getElementById("layerList");
 const tabularDialog = document.getElementById("tabularDialog");
@@ -26,10 +46,25 @@ const yFieldSelect = document.getElementById("yFieldSelect");
 const nameFieldSelect = document.getElementById("nameFieldSelect");
 
 const map = L.map("map").setView([23.75, 121], 7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-}).addTo(map);
+
+const baseLayers = {
+  osm: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap 貢獻者",
+  }),
+  googleSat: L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+    maxZoom: 20,
+  }),
+  googleTerrain: L.tileLayer("https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}", {
+    maxZoom: 18,
+  }),
+  nlscPhoto: L.tileLayer(
+    "https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}",
+    { maxZoom: 20 }
+  ),
+};
+
+baseLayers.osm.addTo(map);
 
 const epsg3826 = "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
 const epsg3825 = "+proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
@@ -38,6 +73,11 @@ proj4.defs("EPSG:3825", epsg3825);
 
 const activeLayers = [];
 const palette = ["#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
+
+let isAdmin = false;
+let measureMode = null;
+let measurePoints = [];
+let measureLayer = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -121,17 +161,21 @@ function refreshLayerList() {
   for (const item of activeLayers) {
     const li = document.createElement("li");
     li.className = "layer-item";
-    li.innerHTML = `
-      <strong>${item.name}（${item.count} 筆）${item.style.visible ? "" : "（已隱藏）"}</strong>
-      <div class="layer-actions">
-        <button type="button" data-action="zoom" data-id="${item.id}">定位</button>
-        <button type="button" data-action="style" data-id="${item.id}">樣式</button>
-        <button type="button" data-action="toggle" data-id="${item.id}">${
-          item.style.visible ? "隱藏" : "顯示"
-        }</button>
-        <button type="button" data-action="remove" data-id="${item.id}">移除</button>
-      </div>
-    `;
+    if (isAdmin) {
+      li.innerHTML = `
+        <strong>${item.name}（${item.count} 筆）${item.style.visible ? "" : "（已隱藏）"}</strong>
+        <div class="layer-actions">
+          <button type="button" data-action="zoom" data-id="${item.id}">定位</button>
+          <button type="button" data-action="style" data-id="${item.id}">樣式</button>
+          <button type="button" data-action="toggle" data-id="${item.id}">${
+            item.style.visible ? "隱藏" : "顯示"
+          }</button>
+          <button type="button" data-action="remove" data-id="${item.id}">移除</button>
+        </div>
+      `;
+    } else {
+      li.innerHTML = `<strong>${item.name}（${item.count} 筆）</strong>`;
+    }
     layerListEl.appendChild(li);
   }
 }
@@ -156,6 +200,7 @@ layerListEl.addEventListener("click", (event) => {
       map.fitBounds(bounds.pad(0.15));
     }
   } else if (action === "style") {
+    if (!isAdmin) return;
     editingStyleLayerId = item.id;
     styleTitle.textContent = `圖層樣式：${item.name}`;
     styleColorInput.value = item.style.color;
@@ -163,6 +208,7 @@ layerListEl.addEventListener("click", (event) => {
     styleVisibleCheckbox.checked = item.style.visible;
     styleDialog.showModal();
   } else if (action === "toggle") {
+    if (!isAdmin) return;
     item.style.visible = !item.style.visible;
     if (item.style.visible) {
       if (!map.hasLayer(item.layer)) {
@@ -173,6 +219,7 @@ layerListEl.addEventListener("click", (event) => {
     }
     refreshLayerList();
   } else if (action === "remove") {
+    if (!isAdmin) return;
     map.removeLayer(item.layer);
     activeLayers.splice(index, 1);
     refreshLayerList();
@@ -180,6 +227,10 @@ layerListEl.addEventListener("click", (event) => {
 });
 
 clearLayersBtn.addEventListener("click", () => {
+  if (!isAdmin) {
+    setStatus("請先登入後台再清除圖層。", true);
+    return;
+  }
   activeLayers.forEach((item) => map.removeLayer(item.layer));
   activeLayers.length = 0;
   refreshLayerList();
@@ -216,6 +267,10 @@ locateBtn.addEventListener("click", () => {
 });
 
 refreshBtn.addEventListener("click", () => {
+  if (!isAdmin) {
+    setStatus("請先登入後台再更新快取。", true);
+    return;
+  }
   if (!navigator.serviceWorker?.controller) {
     window.location.reload();
     return;
@@ -511,6 +566,11 @@ async function importFile(file) {
 }
 
 fileInput.addEventListener("change", async (event) => {
+  if (!isAdmin) {
+    setStatus("請先登入後台再匯入資料。", true);
+    event.target.value = "";
+    return;
+  }
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || !target.files?.length) {
     return;
@@ -557,6 +617,10 @@ function toGoogleCsvUrl(inputUrl) {
 }
 
 importSheetBtn.addEventListener("click", async () => {
+  if (!isAdmin) {
+    setStatus("請先登入後台再匯入線上儲存格。", true);
+    return;
+  }
   const raw = sheetUrlInput.value.trim();
   if (!raw) {
     setStatus("請先貼上線上儲存格網址。", true);
@@ -593,3 +657,194 @@ if ("serviceWorker" in navigator) {
     }
   });
 }
+
+function updateAdminUI() {
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.classList.toggle("hidden", !isAdmin);
+  });
+  refreshLayerList();
+}
+
+updateAdminUI();
+
+adminBtn.addEventListener("click", () => {
+  adminPasswordInput.value = "";
+  adminDialog.showModal();
+});
+
+adminForm.addEventListener("submit", () => {
+  if (adminDialog.returnValue !== "default") {
+    return;
+  }
+  const pwd = adminPasswordInput.value;
+  if (pwd === "ABC123") {
+    isAdmin = true;
+    updateAdminUI();
+    setStatus("已登入後台。");
+  } else {
+    setStatus("密碼錯誤。", true);
+  }
+});
+
+styleForm.addEventListener("submit", () => {
+  if (styleDialog.returnValue !== "default" || !editingStyleLayerId) {
+    editingStyleLayerId = null;
+    return;
+  }
+  const item = activeLayers.find((l) => l.id === editingStyleLayerId);
+  editingStyleLayerId = null;
+  if (!item) return;
+
+  item.style.color = styleColorInput.value || item.style.color;
+  item.style.marker = styleMarkerSelect.value;
+  item.style.visible = styleVisibleCheckbox.checked;
+
+  map.removeLayer(item.layer);
+  item.layer = createLeafletLayer(item.geojson, item.style);
+  if (item.style.visible) {
+    item.layer.addTo(map);
+  }
+  refreshLayerList();
+});
+
+basemapSelect.addEventListener("change", () => {
+  const key = basemapSelect.value;
+  Object.values(baseLayers).forEach((layer) => {
+    if (map.hasLayer(layer)) {
+      map.removeLayer(layer);
+    }
+  });
+  const next = baseLayers[key] || baseLayers.osm;
+  next.addTo(map);
+});
+
+measureDistanceBtn.addEventListener("click", () => {
+  measureMode = "distance";
+  measurePoints = [];
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+  setStatus("量距模式：請在地圖上連續點擊。");
+});
+
+measureAreaBtn.addEventListener("click", () => {
+  measureMode = "area";
+  measurePoints = [];
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+  setStatus("量面積模式：請在地圖上連續點擊。");
+});
+
+measureClearBtn.addEventListener("click", () => {
+  measureMode = null;
+  measurePoints = [];
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+  setStatus("已清除量測。");
+});
+
+map.on("click", (event) => {
+  if (!measureMode) return;
+  const latlng = event.latlng;
+  measurePoints.push(latlng);
+
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+
+  if (measureMode === "distance") {
+    measureLayer = L.polyline(measurePoints, { color: "#f97316", weight: 3 }).addTo(map);
+    if (measurePoints.length >= 2) {
+      let total = 0;
+      for (let i = 1; i < measurePoints.length; i += 1) {
+        total += measurePoints[i - 1].distanceTo(measurePoints[i]);
+      }
+      const km = total / 1000;
+      setStatus(`距離：${total.toFixed(1)} 公尺（約 ${km.toFixed(3)} 公里）`);
+    }
+  } else if (measureMode === "area" && measurePoints.length >= 3) {
+    measureLayer = L.polygon(measurePoints, {
+      color: "#22c55e",
+      weight: 2,
+      fillOpacity: 0.25,
+    }).addTo(map);
+    const latlngs = measurePoints.map((p) => [p.lat, p.lng]);
+    const area = L.GeometryUtil.geodesicArea(latlngs);
+    const ha = area / 10000;
+    setStatus(`面積：${area.toFixed(1)} 平方公尺（約 ${ha.toFixed(3)} 公頃）`);
+  }
+});
+
+coordInputSystem.addEventListener("change", () => {
+  coordInputZoneWrap.classList.toggle("hidden", coordInputSystem.value !== "twd97");
+});
+
+coordLocateBtn.addEventListener("click", () => {
+  coordResult.textContent = "";
+  coordDialog.showModal();
+});
+
+coordForm.addEventListener("submit", () => {
+  if (coordDialog.returnValue !== "default") {
+    return;
+  }
+  const sys = coordInputSystem.value;
+  const zone = coordInputZone.value || "121";
+  const x = Number(coordInputX.value);
+  const y = Number(coordInputY.value);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    coordResult.textContent = "請輸入有效數值。";
+    return;
+  }
+
+  let lon;
+  let lat;
+  if (sys === "wgs84") {
+    lon = x;
+    lat = y;
+  } else {
+    const src =
+      zone === "119"
+        ? "+proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs"
+        : "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
+    [lon, lat] = proj4(src, "EPSG:4326", [x, y]);
+  }
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    coordResult.textContent = "坐標轉換失敗。";
+    return;
+  }
+
+  map.setView([lat, lon], 16);
+  L.circleMarker([lat, lon], {
+    radius: 6,
+    color: "#0ea5e9",
+    fillColor: "#0ea5e9",
+    fillOpacity: 0.9,
+    weight: 2,
+  })
+    .addTo(map)
+    .bindPopup(`WGS84: ${lon.toFixed(6)}, ${lat.toFixed(6)}`)
+    .openPopup();
+
+  if (sys === "wgs84") {
+    const src =
+      zone === "119"
+        ? "+proj=tmerc +lat_0=0 +lon_0=119 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs"
+        : "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
+    const [tx, ty] = proj4("EPSG:4326", src, [lon, lat]);
+    coordResult.textContent = `WGS84: (${lon.toFixed(
+      6
+    )}, ${lat.toFixed(6)})；TWD97(${zone}): (${tx.toFixed(3)}, ${ty.toFixed(3)})`;
+  } else {
+    coordResult.textContent = `TWD97(${zone}): (${x.toFixed(
+      3
+    )}, ${y.toFixed(3)})；WGS84: (${lon.toFixed(6)}, ${lat.toFixed(6)})`;
+  }
+});
