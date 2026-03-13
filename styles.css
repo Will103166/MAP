@@ -1,0 +1,170 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI", "Microsoft JhengHei UI", sans-serif;
+  color: #0f172a;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+}
+
+.toolbar {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.toolbar h1 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+input[type="file"],
+input[type="url"],
+button,
+select {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+input[type="url"] {
+  flex: 1 1 420px;
+}
+
+button {
+  background: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+.hint {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.status {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+}
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.side-panel {
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 10px;
+  overflow: auto;
+}
+
+.side-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+#layerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.layer-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.layer-item strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+}
+
+.layer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.layer-actions button {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+#map {
+  min-height: 420px;
+  width: 100%;
+}
+
+dialog {
+  width: min(92vw, 420px);
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+dialog form {
+  display: grid;
+  gap: 10px;
+}
+
+dialog label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.hidden {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 180px 1fr;
+  }
+
+  .side-panel {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}

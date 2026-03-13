@@ -1,0 +1,17 @@
+{
+  "name": "線上地圖 PWA",
+  "short_name": "線上地圖",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "description": "可匯入 SHP ZIP、KMZ/KML、CSV 與線上儲存格的地圖工具",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%232563eb'/%3E%3Cpath d='M256 96c77 0 140 63 140 140 0 103-140 240-140 240S116 339 116 236c0-77 63-140 140-140zm0 72a68 68 0 100 136 68 68 0 000-136z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

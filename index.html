@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2563eb" />
+    <title>線上地圖 PWA</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>線上地圖 PWA</h1>
+      <div class="control-row">
+        <input
+          id="fileInput"
+          type="file"
+          accept=".zip,.kmz,.kml,.csv"
+          multiple
+        />
+        <button id="clearLayersBtn" type="button">清除圖層</button>
+      </div>
+      <div class="control-row">
+        <input
+          id="sheetUrlInput"
+          type="url"
+          placeholder="貼上 Google 試算表或 CSV 網址"
+        />
+        <button id="importSheetBtn" type="button">匯入線上儲存格</button>
+      </div>
+      <p class="hint">
+        支援：SHP ZIP（含 .shp/.shx/.dbf）、KMZ/KML、CSV、Google 試算表 URL。
+      </p>
+      <div id="status" class="status">準備完成。</div>
+    </header>
+
+    <main class="layout">
+      <aside class="side-panel">
+        <h2>圖層清單</h2>
+        <ul id="layerList"></ul>
+      </aside>
+      <section id="map" aria-label="地圖"></section>
+    </main>
+
+    <dialog id="tabularDialog">
+      <form id="tabularForm" method="dialog">
+        <h3 id="tabularTitle">欄位設定</h3>
+        <label>
+          座標系統
+          <select id="coordSystemSelect">
+            <option value="wgs84">WGS84 (經緯度)</option>
+            <option value="twd97">TWD97 TM2</option>
+          </select>
+        </label>
+        <label id="twd97ZoneWrap" class="hidden">
+          TWD97 分帶
+          <select id="twd97ZoneSelect">
+            <option value="121">121（台灣本島常用）</option>
+            <option value="119">119（金門/馬祖/澎湖常見）</option>
+          </select>
+        </label>
+        <label>
+          X / 經度欄位
+          <select id="xFieldSelect"></select>
+        </label>
+        <label>
+          Y / 緯度欄位
+          <select id="yFieldSelect"></select>
+        </label>
+        <label>
+          名稱欄位（可選）
+          <select id="nameFieldSelect"></select>
+        </label>
+        <menu>
+          <button value="cancel" type="submit">取消</button>
+          <button id="tabularConfirmBtn" value="default" type="submit">
+            匯入
+          </button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shpjs@latest/dist/shp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
