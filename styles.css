@@ -153,6 +153,21 @@ dialog menu {
   padding: 0;
 }
 
+.layer-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .hidden {
   display: none;
 }

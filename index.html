@@ -24,6 +24,7 @@
           accept=".zip,.kmz,.kml,.csv"
           multiple
         />
+        <button id="locateMeBtn" type="button">定位到我的位置</button>
         <button id="clearLayersBtn" type="button">清除圖層</button>
       </div>
       <div class="control-row">
@@ -81,6 +82,36 @@
           <button value="cancel" type="submit">取消</button>
           <button id="tabularConfirmBtn" value="default" type="submit">
             匯入
+          </button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="styleDialog">
+      <form id="styleForm" method="dialog">
+        <h3 id="styleTitle">圖層樣式設定</h3>
+        <label>
+          圖層顏色
+          <input id="styleColorInput" type="color" value="#2563eb" />
+        </label>
+        <label>
+          點位圖示
+          <select id="stylePointTypeSelect">
+            <option value="circle">圓點</option>
+            <option value="marker">圖釘</option>
+          </select>
+        </label>
+        <label>
+          是否顯示
+          <select id="styleVisibleSelect">
+            <option value="true">顯示</option>
+            <option value="false">隱藏</option>
+          </select>
+        </label>
+        <menu>
+          <button value="cancel" type="submit">取消</button>
+          <button id="styleConfirmBtn" value="default" type="submit">
+            套用
           </button>
         </menu>
       </form>

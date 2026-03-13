@@ -5,6 +5,7 @@ const fileInput = document.getElementById("fileInput");
 const sheetUrlInput = document.getElementById("sheetUrlInput");
 const importSheetBtn = document.getElementById("importSheetBtn");
 const clearLayersBtn = document.getElementById("clearLayersBtn");
+const locateMeBtn = document.getElementById("locateMeBtn");
 const layerListEl = document.getElementById("layerList");
 const tabularDialog = document.getElementById("tabularDialog");
 const tabularForm = document.getElementById("tabularForm");
@@ -15,6 +16,12 @@ const twd97ZoneSelect = document.getElementById("twd97ZoneSelect");
 const xFieldSelect = document.getElementById("xFieldSelect");
 const yFieldSelect = document.getElementById("yFieldSelect");
 const nameFieldSelect = document.getElementById("nameFieldSelect");
+const styleDialog = document.getElementById("styleDialog");
+const styleForm = document.getElementById("styleForm");
+const styleTitle = document.getElementById("styleTitle");
+const styleColorInput = document.getElementById("styleColorInput");
+const stylePointTypeSelect = document.getElementById("stylePointTypeSelect");
+const styleVisibleSelect = document.getElementById("styleVisibleSelect");
 
 const map = L.map("map").setView([23.75, 121], 7);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -28,6 +35,7 @@ proj4.defs("EPSG:3826", epsg3826);
 proj4.defs("EPSG:3825", epsg3825);
 
 const activeLayers = [];
+let styleEditingLayerId = null;
 const palette = ["#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
 
 function setStatus(message, isError = false) {
@@ -49,18 +57,24 @@ function normalizeLayerInput(geojson) {
   return [{ name: "圖層 1", geojson }];
 }
 
-function addGeoJsonLayer(layerName, geojson, colorHint) {
-  const color = colorHint || palette[activeLayers.length % palette.length];
-  const layer = L.geoJSON(geojson, {
+function buildLeafletLayer(geojson, style) {
+  const color = style.color;
+  const pointType = style.pointType;
+
+  return L.geoJSON(geojson, {
     style: () => ({ color, weight: 2, fillOpacity: 0.18 }),
-    pointToLayer: (feature, latlng) =>
-      L.circleMarker(latlng, {
+    pointToLayer: (feature, latlng) => {
+      if (pointType === "marker") {
+        return L.marker(latlng);
+      }
+      return L.circleMarker(latlng, {
         radius: 5,
         color,
         fillColor: color,
         fillOpacity: 0.75,
         weight: 1,
-      }),
+      });
+    },
     onEachFeature: (feature, l) => {
       const props = feature?.properties || {};
       const name = props.name || props.名稱 || props.title || "";
@@ -75,13 +89,25 @@ function addGeoJsonLayer(layerName, geojson, colorHint) {
         );
       }
     },
-  }).addTo(map);
+  });
+}
+
+function addGeoJsonLayer(layerName, geojson, colorHint) {
+  const style = {
+    color: colorHint || palette[activeLayers.length % palette.length],
+    pointType: "circle",
+    visible: true,
+  };
+
+  const layer = buildLeafletLayer(geojson, style).addTo(map);
 
   const item = {
     id: crypto.randomUUID(),
     name: layerName,
     layer,
     count: geojson?.features?.length || 0,
+    geojson,
+    style,
   };
   activeLayers.push(item);
   refreshLayerList();
@@ -98,9 +124,17 @@ function refreshLayerList() {
     const li = document.createElement("li");
     li.className = "layer-item";
     li.innerHTML = `
-      <strong>${item.name}（${item.count} 筆）</strong>
+      <div class="layer-meta">
+        <span>${item.name}</span>
+        <label class="layer-toggle">
+          <input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.style.visible ? "checked" : ""} />
+          顯示
+        </label>
+      </div>
+      <strong>筆數：${item.count}</strong>
       <div class="layer-actions">
         <button type="button" data-action="zoom" data-id="${item.id}">定位</button>
+        <button type="button" data-action="style" data-id="${item.id}">樣式</button>
         <button type="button" data-action="remove" data-id="${item.id}">移除</button>
       </div>
     `;
@@ -131,6 +165,44 @@ layerListEl.addEventListener("click", (event) => {
     map.removeLayer(item.layer);
     activeLayers.splice(index, 1);
     refreshLayerList();
+  } else if (action === "toggle") {
+    item.style.visible = target.checked;
+    if (item.style.visible) {
+      item.layer.addTo(map);
+    } else {
+      map.removeLayer(item.layer);
+    }
+  } else if (action === "style") {
+    styleEditingLayerId = item.id;
+    styleTitle.textContent = `圖層樣式設定 - ${item.name}`;
+    styleColorInput.value = item.style.color;
+    stylePointTypeSelect.value = item.style.pointType;
+    styleVisibleSelect.value = String(item.style.visible);
+
+    const onClose = () => {
+      styleDialog.removeEventListener("close", onClose);
+      if (styleDialog.returnValue !== "default" || !styleEditingLayerId) {
+        styleEditingLayerId = null;
+        return;
+      }
+      const editing = activeLayers.find((l) => l.id === styleEditingLayerId);
+      styleEditingLayerId = null;
+      if (!editing) return;
+
+      editing.style.color = styleColorInput.value || editing.style.color;
+      editing.style.pointType = stylePointTypeSelect.value === "marker" ? "marker" : "circle";
+      editing.style.visible = styleVisibleSelect.value === "true";
+
+      map.removeLayer(editing.layer);
+      editing.layer = buildLeafletLayer(editing.geojson, editing.style);
+      if (editing.style.visible) {
+        editing.layer.addTo(map);
+      }
+      refreshLayerList();
+    };
+
+    styleDialog.addEventListener("close", onClose);
+    styleDialog.showModal();
   }
 });
 
@@ -139,6 +211,34 @@ clearLayersBtn.addEventListener("click", () => {
   activeLayers.length = 0;
   refreshLayerList();
   setStatus("已清除全部圖層。");
+});
+
+locateMeBtn.addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    setStatus("此瀏覽器不支援定位功能。", true);
+    return;
+  }
+  setStatus("嘗試取得目前位置...");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      map.setView([latitude, longitude], 16);
+      L.circleMarker([latitude, longitude], {
+        radius: 7,
+        color: "#22c55e",
+        fillColor: "#22c55e",
+        fillOpacity: 0.8,
+        weight: 2,
+      })
+        .addTo(map)
+        .bindPopup("目前位置")
+        .openPopup();
+      setStatus("已定位到目前位置。");
+    },
+    (err) => {
+      setStatus(`定位失敗：${err.message}`, true);
+    }
+  );
 });
 
 coordSystemSelect.addEventListener("change", () => {
@@ -279,8 +379,56 @@ async function importZipShapefile(file) {
     throw new Error("ZIP 內找不到可用 SHP。");
   }
 
+  const reprojectIfNeeded = (geojson) => {
+    if (!geojson?.features?.length) return geojson;
+    const first = geojson.features.find((f) => f.geometry && Array.isArray(f.geometry.coordinates));
+    if (!first) return geojson;
+
+    const coords = first.geometry.coordinates;
+    const flat = typeof coords[0] === "number" ? coords : coords.flat(10);
+    const x = Number(flat[0]);
+    const y = Number(flat[1]);
+
+    const looksLikeWgs =
+      x >= 118 &&
+      x <= 123 &&
+      y >= 20 &&
+      y <= 27;
+    if (looksLikeWgs) {
+      return geojson;
+    }
+
+    const looksLikeTwd97 =
+      x >= 150000 &&
+      x <= 350000 &&
+      y >= 2400000 &&
+      y <= 2800000;
+    if (!looksLikeTwd97) {
+      return geojson;
+    }
+
+    const from = "EPSG:3826";
+
+    const transformCoords = (c) => {
+      if (typeof c[0] === "number") {
+        const [lon, lat] = proj4(from, "EPSG:4326", c);
+        return [lon, lat];
+      }
+      return c.map((inner) => transformCoords(inner));
+    };
+
+    const cloned = JSON.parse(JSON.stringify(geojson));
+    cloned.features.forEach((f) => {
+      if (f.geometry && Array.isArray(f.geometry.coordinates)) {
+        f.geometry.coordinates = transformCoords(f.geometry.coordinates);
+      }
+    });
+    return cloned;
+  };
+
   collections.forEach((item, idx) => {
-    addGeoJsonLayer(`${file.name} - ${item.name || `圖層${idx + 1}`}`, item.geojson);
+    const fixed = reprojectIfNeeded(item.geojson);
+    addGeoJsonLayer(`${file.name} - ${item.name || `圖層${idx + 1}`}`, fixed);
   });
 
   setStatus(`匯入完成：${file.name}（${collections.length} 個圖層）`);
