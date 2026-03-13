@@ -12,6 +12,7 @@ const measureDistanceBtn = document.getElementById("measureDistanceBtn");
 const measureAreaBtn = document.getElementById("measureAreaBtn");
 const measureClearBtn = document.getElementById("measureClearBtn");
 const gotoTwd97Btn = document.getElementById("gotoTwd97Btn");
+const rayBtn = document.getElementById("rayBtn");
 const styleDialog = document.getElementById("styleDialog");
 const styleForm = document.getElementById("styleForm");
 const styleTitle = document.getElementById("styleTitle");
@@ -52,13 +53,6 @@ const baseLayers = {
     maxZoom: 19,
     attribution: "© Google",
   }),
-  nlscPhoto: L.tileLayer(
-    "https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{x}/{y}.jpeg",
-    {
-      maxZoom: 19,
-      attribution: "© 國土測繪中心",
-    }
-  ),
 };
 
 let currentBase = baseLayers.osm;
@@ -75,6 +69,8 @@ const palette = ["#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2
 let measureMode = "none";
 let measurePoints = [];
 let measureLayer = null;
+let rayLayer = null;
+let rayPoints = [];
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -559,6 +555,79 @@ map.on("click", (event) => {
   if (measureMode === "none") return;
   measurePoints.push(event.latlng);
   updateMeasureGraphics();
+});
+
+rayBtn.addEventListener("click", () => {
+  measureMode = "none";
+  measurePoints = [];
+  if (measureLayer) {
+    map.removeLayer(measureLayer);
+    measureLayer = null;
+  }
+  if (rayLayer) {
+    map.removeLayer(rayLayer);
+    rayLayer = null;
+  }
+  rayPoints = [];
+  setStatus("兩點射線模式：請在地圖上點選起點與終點。");
+
+  const onceClick = (event) => {
+    rayPoints.push(event.latlng);
+    if (rayPoints.length < 2) {
+      setStatus("已選起點，請再點一次終點。");
+      return;
+    }
+
+    map.off("click", onceClick);
+    const [p1, p2] = rayPoints;
+    const bounds = map.getBounds();
+
+    const lat1 = (p1.lat * Math.PI) / 180;
+    const lon1 = (p1.lng * Math.PI) / 180;
+    const lat2 = (p2.lat * Math.PI) / 180;
+    const lon2 = (p2.lng * Math.PI) / 180;
+
+    const dLon = lon2 - lon1;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const bearing = Math.atan2(y, x);
+
+    const extendPoint = (distanceMeters) => {
+      const R = 6378137;
+      const angDist = distanceMeters / R;
+      const lat = Math.asin(
+        Math.sin(lat1) * Math.cos(angDist) +
+          Math.cos(lat1) * Math.sin(angDist) * Math.cos(bearing)
+      );
+      const lon =
+        lon1 +
+        Math.atan2(
+          Math.sin(bearing) * Math.sin(angDist) * Math.cos(lat1),
+          Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat)
+        );
+      return L.latLng((lat * 180) / Math.PI, (lon * 180) / Math.PI);
+    };
+
+    const diag = map.distance(bounds.getSouthWest(), bounds.getNorthEast());
+    const end = extendPoint(diag * 2);
+
+    if (rayLayer) {
+      map.removeLayer(rayLayer);
+    }
+    rayLayer = L.polyline([p1, end], { color: "#22c55e", weight: 3 }).addTo(map);
+
+    const dist = map.distance(p1, p2);
+    const deg = ((bearing * 180) / Math.PI + 360) % 360;
+    setStatus(
+      `兩點射線：起點到終點距離 ${dist.toFixed(
+        1
+      )} m，方位角約 ${deg.toFixed(1)}°（由起點指向終點延伸）。`
+    );
+  };
+
+  map.on("click", onceClick);
 });
 
 gotoTwd97Btn.addEventListener("click", () => {
