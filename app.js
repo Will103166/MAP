@@ -75,6 +75,8 @@ let rayPoints = [];
 let circleMode = false;
 let circleRadius = 0;
 let circleLayers = [];
+const DEFAULT_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1x1BUCRV6WdVjlNE7aAHd_G3zCbLZE2-RlFZ_hY4N9V8/edit?gid=0";
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -116,6 +118,36 @@ function createLeafletLayer(geojson, style) {
     },
     onEachFeature: (feature, l) => {
       const props = feature?.properties || {};
+
+      if (props.__popupType === "defaultSheet") {
+        const name = props["店家名稱"] ?? "";
+        const addr = props["營業地址"] ?? "";
+        const shopUrl = props["店家網址"] ?? "";
+        const mapUrl = props["地圖網址"] ?? "";
+
+        const parts = [];
+        if (name) {
+          parts.push(`<strong>${name}</strong>`);
+        }
+        if (addr) {
+          parts.push(addr);
+        }
+        if (shopUrl) {
+          parts.push(
+            `<a href="${shopUrl}" target="_blank" rel="noopener">店家網址</a>`
+          );
+        }
+        if (mapUrl) {
+          parts.push(
+            `<a href="${mapUrl}" target="_blank" rel="noopener">地圖網址</a>`
+          );
+        }
+        if (parts.length) {
+          l.bindPopup(parts.join("<br>"));
+          return;
+        }
+      }
+
       const name = props.name || props.名稱 || props.title || "";
       if (name) {
         l.bindPopup(String(name));
@@ -425,6 +457,44 @@ async function importCsvContent(csvText, sourceName) {
   const geojson = rowsToGeoJSON(parsed.data, config);
   addGeoJsonLayer(sourceName, geojson);
   setStatus(`匯入完成：${sourceName}，共 ${geojson.features.length} 筆點位。`);
+}
+
+async function importDefaultSheet() {
+  try {
+    const csvUrl = toGoogleCsvUrl(DEFAULT_SHEET_URL);
+    setStatus("自動下載運動幣資料中 ...");
+    const response = await fetch(csvUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const csvText = await response.text();
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+    });
+    if (parsed.errors.length > 0) {
+      throw new Error(parsed.errors[0].message);
+    }
+
+    const config = {
+      coordSystem: "wgs84",
+      zone: "",
+      xField: "經度",
+      yField: "緯度",
+      nameField: "店家名稱",
+    };
+    const geojson = rowsToGeoJSON(parsed.data, config);
+    geojson.features.forEach((f) => {
+      if (!f.properties) f.properties = {};
+      f.properties.__popupType = "defaultSheet";
+    });
+
+    addGeoJsonLayer("運動幣 - 工作表1", geojson);
+    setStatus(`自動匯入完成：運動幣，共 ${geojson.features.length} 筆點位。`);
+  } catch (error) {
+    setStatus(`自動匯入運動幣失敗：${error.message}`, true);
+  }
 }
 
 async function importZipShapefile(file) {
@@ -951,5 +1021,8 @@ if ("serviceWorker" in navigator) {
     } catch (error) {
       console.warn("SW 註冊失敗:", error);
     }
+    importDefaultSheet();
   });
+} else {
+  importDefaultSheet();
 }
