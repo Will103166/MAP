@@ -74,7 +74,7 @@ let rayLayer = null;
 let rayPoints = [];
 let circleMode = false;
 let circleRadius = 0;
-let circleLayer = null;
+let circleLayers = [];
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -552,6 +552,14 @@ measureClearBtn.addEventListener("click", () => {
     map.removeLayer(measureLayer);
     measureLayer = null;
   }
+  circleMode = false;
+  circleRadius = 0;
+  circleLayers.forEach((c) => map.removeLayer(c));
+  circleLayers = [];
+  if (rayLayer) {
+    map.removeLayer(rayLayer);
+    rayLayer = null;
+  }
   setStatus("已清除量測。");
 });
 
@@ -584,17 +592,15 @@ map.on("click", (event) => {
   }
 
   if (circleMode && circleRadius > 0) {
-    if (circleLayer) {
-      map.removeLayer(circleLayer);
-    }
-    circleLayer = L.circle(event.latlng, {
+    const circle = L.circle(event.latlng, {
       radius: circleRadius,
       color: "#0ea5e9",
       weight: 2,
       fillColor: "#38bdf8",
       fillOpacity: 0.25,
     }).addTo(map);
-    setStatus(`圓：半徑 ${circleRadius.toFixed(2)} m。可再次點選以變更圓心。`);
+    circleLayers.push(circle);
+    setStatus(`圓：半徑 ${circleRadius.toFixed(2)} m。可再次點選以新增其他圓。`);
   }
 });
 
@@ -691,7 +697,9 @@ gotoTwd97Btn.addEventListener("click", () => {
 
 gotoForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (gotoDialog.returnValue !== "default") {
+  const action = event.submitter?.value;
+  if (action !== "default") {
+    gotoDialog.close("cancel");
     return;
   }
 
