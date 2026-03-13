@@ -1,4 +1,4 @@
-const CACHE_NAME = "online-map-pwa-v1";
+const CACHE_NAME = "online-map-pwa-v2";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -12,11 +12,30 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
   );
   self.clients.claim();
+});
+
+self.addEventListener("message", (event) => {
+  if (!event.data) return;
+  if (event.data.type === "CLEAR_CACHE_AND_RELOAD") {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        .then(() => self.skipWaiting())
+        .then(() => self.clients.claim())
+        .then(() =>
+          self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+            clients.forEach((client) => client.navigate(client.url));
+          })
+        )
+    );
+  }
 });
 
 self.addEventListener("fetch", (event) => {
